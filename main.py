@@ -288,6 +288,90 @@ async def create_bulk_users(users: List[User], tenant_id: str = Depends(get_tena
         "tenant_id": tenant_id
     }
 
+# Langflow Proxy Endpoints
+@app.api_route("/api/v1/langflow/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def proxy_to_langflow(request: Request, path: str, tenant_id: str = Depends(get_tenant_from_domain)):
+    """Proxy requests to Langflow with tenant context"""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Get request body
+            body = await request.body()
+
+            # Forward headers (excluding host)
+            headers = dict(request.headers)
+            headers.pop("host", None)
+            headers["X-Tenant-ID"] = tenant_id
+
+            # Construct Langflow URL
+            langflow_endpoint = f"{LANGFLOW_URL}/api/v1/{path}"
+            if request.query_params:
+                langflow_endpoint += f"?{request.query_params}"
+
+            logger.info(f"Proxying {request.method} {path} to Langflow for tenant: {tenant_id}")
+
+            # Forward request to Langflow
+            response = await client.request(
+                method=request.method,
+                url=langflow_endpoint,
+                headers=headers,
+                content=body,
+                params=request.query_params
+            )
+
+            # Return response
+            return JSONResponse(
+                content=response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text,
+                status_code=response.status_code,
+                headers=dict(response.headers)
+            )
+
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Langflow request timeout")
+    except httpx.RequestError as e:
+        logger.error(f"Langflow proxy error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Langflow connection error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Langflow proxy unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Proxy error: {str(e)}")
+
+# Langflow Direct Endpoints (for frontend compatibility)
+@app.get("/api/v1/flows")
+async def get_flows(tenant_id: str = Depends(get_tenant_from_domain)):
+    """Get flows from Langflow"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{LANGFLOW_URL}/api/v1/flows")
+        return response.json()
+
+@app.post("/api/v1/flows/{flow_id}/run")
+async def run_flow(flow_id: str, request: Request, tenant_id: str = Depends(get_tenant_from_domain)):
+    """Run a flow in Langflow"""
+    body = await request.body()
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{LANGFLOW_URL}/api/v1/flows/{flow_id}/run",
+            content=body,
+            headers={"Content-Type": "application/json", "X-Tenant-ID": tenant_id}
+        )
+        return response.json()
+
+# Admin Endpoints
+@app.get("/api/v1/admin/stats")
+async def get_admin_stats():
+    """Get platform statistics"""
+    total_users = len(users_db)
+    active_users = len([u for u in users_db.values() if u["is_active"]])
+    total_tenants = len(tenants_db)
+    white_label_enabled = len([t for t in tenants_db.values() if t.get("white_label_enabled", False)])
+
+    return {
+        "total_tenants": total_tenants,
+        "total_users": total_users,
+        "active_users": active_users,
+        "white_label_enabled": white_label_enabled,
+        "langflow_url": LANGFLOW_URL,
+        "langflow_status": "connected"
+    }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -7,7 +7,7 @@ Multi-tenant backend API for the Axie Studio platform.
 - **Multi-tenant Architecture**: Support for multiple clients with domain-based routing
 - **User Management**: Create, list, and manage users per tenant
 - **Authentication**: JWT-based authentication with admin and user roles
-- **Langflow Integration**: Proxy to existing Langflow instance
+- **Axie Studio Integration**: Proxy to existing Axie Studio backend instance
 - **White-label Support**: Customizable branding per tenant
 - **Bulk Operations**: Mass user creation and management
 
@@ -23,12 +23,12 @@ Multi-tenant backend API for the Axie Studio platform.
 - `POST /api/v1/users/bulk` - Create multiple users
 
 ### Health Check
-- `GET /health` - Health check with Langflow status
+- `GET /health` - Health check with Axie Studio backend status
 
 ## Environment Variables
 
 ```bash
-LANGFLOW_URL=https://langflow-tv34o.ondigitalocean.app
+AXIE_STUDIO_BACKEND_URL=https://langflow-tv34o.ondigitalocean.app
 SECRET_KEY=your-secret-key
 JWT_SECRET=your-jwt-secret
 ALLOWED_ORIGINS=https://your-frontend.vercel.app
@@ -77,12 +77,12 @@ The API automatically detects tenant from the `Host` header:
 
 This backend is designed to work with:
 - **Frontend**: Axie Studio React application on Vercel
-- **AI Engine**: Existing Langflow instance at `langflow-tv34o.ondigitalocean.app`
+- **AI Engine**: Existing Axie Studio backend instance at `axie-studio-backend.ondigitalocean.app`
 
 ## Architecture
 
 ```
-Frontend (Vercel) → Backend (Digital Ocean) → Langflow (Existing)
+Frontend (Vercel) → Backend (Digital Ocean) → Axie Studio Backend (Existing)
 ```
 
 Built with FastAPI, designed for production deployment on Digital Ocean App Platform.
